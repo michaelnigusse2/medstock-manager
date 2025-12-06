@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { User, UserRole } from '@/types/pharmacy';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { User } from '@/types/pharmacy';
 
 interface AuthContextType {
   user: User | null;
@@ -7,65 +7,93 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Demo users for the prototype
-const DEMO_USERS: Array<User & { password: string }> = [
-  {
-    id: '1',
-    username: 'admin',
-    password: 'AdminPass123!',
-    role: 'Admin',
-    fullName: 'System Administrator',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    username: 'cashier1',
-    password: 'Cash1Pass!',
-    role: 'Cashier',
-    fullName: 'John Cashier',
-    createdAt: new Date().toISOString(),
-  },
-];
+const API_URL = 'http://localhost:3000/api';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('pharmacy_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('pharmacy_token'));
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUser = useCallback(async (jwt: string) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        setToken(null);
+        localStorage.removeItem('pharmacy_token');
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+      setToken(null);
+      localStorage.removeItem('pharmacy_token');
+      setUser(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const validateToken = async () => {
+      if (token) {
+        await fetchUser(token);
+      }
+      setIsLoading(false);
+    };
+    validateToken();
+  }, [token, fetchUser]);
 
   const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const foundUser = DEMO_USERS.find(
-      u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-    );
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('pharmacy_user', JSON.stringify(userWithoutPassword));
-      return true;
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (response.ok) {
+        const { token: newToken } = await response.json();
+        setToken(newToken);
+        localStorage.setItem('pharmacy_token', newToken);
+        await fetchUser(newToken);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
     }
-    return false;
-  }, []);
+  }, [fetchUser]);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('pharmacy_user');
+    setToken(null);
+    localStorage.removeItem('pharmacy_token');
   }, []);
 
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user,
+    isAuthenticated: !!token && !!user,
     isAdmin: user?.role === 'Admin',
     login,
     logout,
+    isLoading,
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Or a proper loading spinner component
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
