@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  code_type   String
+  code_value  String   @unique
+  name        String
+  strength    String?
+  form        String?
+  pack_size   Int?
+  uom         String?
+  unit_price  Float?
+  unit_cost   Float?
+  batches     Batch[]
+  sale_lines  SaleLine[]
+  adjustments Adjustment[]
+  issues      Issue[]
+}
+
+model Batch {
+  id          Int      @id @default(autoincrement())
+  product     Product  @relation(fields: [product_id], references: [id])
+  product_id  Int
+  lot         String
+  expiry      DateTime?
+  qty_on_hand Int      @default(0)
+  unit_cost   Float?
+  sale_lines  SaleLine[]
+  adjustments Adjustment[]
+  issues      Issue[]
+}
+
+model Sale {
+  id              Int        @id @default(autoincrement())
+  created_utc     DateTime   @default(now())
+  created_by      String?
+  patient         String?
+  subtotal        Float
+  discount        Float      @default(0)
+  tax             Float      @default(0)
+  total           Float
+  payment_method  String?
+  cash_received   Float?
+  change_due      Float?
+  notes           String?
+  status          String     @default("Completed") // Completed | Voided
+  voided_utc      DateTime?
+  void_reason     String?
+  sale_lines      SaleLine[]
+}
+
+model SaleLine {
+  id          Int     @id @default(autoincrement())
+  sale        Sale    @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  sale_id     Int
+  product     Product @relation(fields: [product_id], references: [id])
+  product_id  Int
+  batch       Batch   @relation(fields: [batch_id], references: [id])
+  batch_id    Int
+  qty         Int
+  unit_price  Float
+  line_total  Float
+}
+
+model Issue {
+  id          Int      @id @default(autoincrement())
+  created_utc DateTime @default(now())
+  created_by  String?
+  product     Product  @relation(fields: [product_id], references: [id])
+  product_id  Int
+  batch       Batch    @relation(fields: [batch_id], references: [id])
+  batch_id    Int
+  qty         Int
+  patient     String?
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  password_hash String
+  role          String   // Admin | Cashier
+  full_name     String?
+  created_utc   DateTime @default(now())
+}
+
+model Adjustment {
+  id          Int      @id @default(autoincrement())
+  created_utc DateTime @default(now())
+  created_by  String?
+  product     Product  @relation(fields: [product_id], references: [id])
+  product_id  Int
+  batch       Batch?   @relation(fields: [batch_id], references: [id])
+  batch_id    Int?
+  delta       Int
+  reason      String?
+}
+
+model Setting {
+  key   String @id
+  value String
+}
