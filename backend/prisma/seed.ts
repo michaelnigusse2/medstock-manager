@@ -8,6 +8,20 @@ const adapter = new PrismaBetterSqlite3({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  console.log('Start seeding...');
+
+  // Clean up database
+  await prisma.adjustment.deleteMany({});
+  await prisma.issue.deleteMany({});
+  await prisma.saleLine.deleteMany({});
+  await prisma.sale.deleteMany({});
+  await prisma.batch.deleteMany({});
+  await prisma.product.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.setting.deleteMany({});
+  console.log('Database cleaned.');
+
+  // 1. Seed Users
   const saltRounds = 10;
   const adminPassword = await bcrypt.hash('AdminPass123!', saltRounds);
   const cashierPassword = await bcrypt.hash('Cash1Pass!', saltRounds);
@@ -28,7 +42,18 @@ async function main() {
       },
     ],
   });
+  console.log('Users seeded.');
 
+  // 2. Seed Settings
+  await prisma.setting.createMany({
+      data: [
+        { key: 'LowStockThreshold', value: '10' },
+        { key: 'NearExpiryDays', value: '90' },
+      ],
+  });
+  console.log('Settings seeded.');
+
+  // 3. Seed Products
   await prisma.product.createMany({
     data: [
       {
@@ -55,7 +80,9 @@ async function main() {
       },
     ],
   });
+  console.log('Products seeded.');
 
+  // 4. Seed Batches
   const amoxicillin = await prisma.product.findUnique({ where: { code_value: '99906000123456' } });
   const paracetamol = await prisma.product.findUnique({ where: { code_value: '99906000123457' } });
 
@@ -78,19 +105,29 @@ async function main() {
           product_id: paracetamol.id,
           lot: 'TBATCH1',
           expiry: new Date('2025-10-15'),
-          qty_on_hand: 50,
+          qty_on_hand: 5, // Low stock for testing
           unit_cost: 1.5,
         },
         {
           product_id: paracetamol.id,
           lot: 'TBATCH2',
-          expiry: new Date('2024-12-31'),
+          expiry: new Date(new Date().setDate(new Date().getDate() + 30)), // Near expiry for testing
           qty_on_hand: 50,
           unit_cost: 1.5,
         },
+        {
+          product_id: paracetamol.id,
+          lot: 'TBATCH3',
+          expiry: new Date('2022-01-01'), // Expired for testing
+          qty_on_hand: 20,
+          unit_cost: 1.4,
+        }
       ],
     });
   }
+  console.log('Batches seeded.');
+
+  console.log('Seeding finished.');
 }
 
 main()
