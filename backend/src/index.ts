@@ -2,13 +2,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { signJwt, authMiddleware } from './auth';
 
-const adapter = new PrismaBetterSqlite3({
-  url: 'file:./dev.db',
-});
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 const app = express();
 const port = 3000;
 
@@ -61,21 +57,32 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
-  const { userId } = (req as any).user;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      username: true,
-      role: true,
-      full_name: true,
-    },
-  });
+  // The user object is attached to the request by the authMiddleware
+  // It contains the payload of the verified JWT.
+  const user = (req as any).user;
 
-  res.json(user);
+  // Return the user data directly from the token payload
+  res.json({
+    id: user.userId,
+    username: user.username,
+    role: user.role,
+    full_name: user.full_name || '', // full_name may not be in the token, handle gracefully
+  });
 });
 
 // --- Inventory Endpoints ---
+
+app.get('/api/products', authMiddleware, async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: { name: 'asc' },
+    });
+    res.json(products);
+  } catch (error) {
+    console.error('Failed to fetch products:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.get('/api/inventory', authMiddleware, async (req, res) => {
   try {
@@ -169,7 +176,7 @@ app.post('/api/receive', authMiddleware, adminOnly, async (req, res) => {
     });
 
     res.status(201).json(newBatch);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to receive stock:', error);
     res.status(500).json({ error: 'Internal server error' });
   }

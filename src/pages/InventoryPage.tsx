@@ -12,7 +12,9 @@ import {
 } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '@/hooks/useApi';
-import { InventoryProduct } from '@/types/pharmacy';
+import { InventoryProduct, Batch } from '@/types/pharmacy';
+import { useAuth } from '@/contexts/AuthContext';
+import { AdjustStockDialog } from '@/components/dialogs/AdjustStockDialog';
 import {
   Search,
   Download,
@@ -25,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Edit,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -46,8 +49,10 @@ export default function InventoryPage() {
     (searchParams.get('filter') as FilterType) || 'all'
   );
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+  const [adjustingBatch, setAdjustingBatch] = useState<{ product: InventoryProduct, batch: Batch } | null>(null);
 
   const api = useApi();
+  const { isAdmin } = useAuth();
 
   const { data: inventory = [], isLoading } = useQuery<InventoryProduct[]>({
     queryKey: ['inventory'],
@@ -196,7 +201,7 @@ export default function InventoryPage() {
                         <TableRow>
                           <TableCell colSpan={5} className="p-0">
                             <div className="bg-muted/50 p-4">
-                              <h4 className="font-semibold mb-2">Batches</h4>
+                              <h4 className="font-semibold mb-2 ml-2">Batches</h4>
                               <Table>
                                 <TableHeader>
                                   <TableRow>
@@ -204,6 +209,7 @@ export default function InventoryPage() {
                                     <TableHead>Expiry</TableHead>
                                     <TableHead className="text-right">Qty</TableHead>
                                     <TableHead>Status</TableHead>
+                                    {isAdmin && <TableHead className="w-24">Actions</TableHead>}
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -217,6 +223,14 @@ export default function InventoryPage() {
                                       <TableCell>
                                          <Badge variant={getBatchStatus(batch).variant} className="capitalize">{getBatchStatus(batch).label}</Badge>
                                       </TableCell>
+                                      {isAdmin && (
+                                        <TableCell>
+                                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setAdjustingBatch({ product, batch }); }}>
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            Adjust
+                                          </Button>
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   ))}
                                 </TableBody>
@@ -232,6 +246,15 @@ export default function InventoryPage() {
             </Table>
         </div>
       </div>
+
+      {adjustingBatch && (
+        <AdjustStockDialog
+          open={!!adjustingBatch}
+          onOpenChange={() => setAdjustingBatch(null)}
+          productName={adjustingBatch.product.name}
+          batch={adjustingBatch.batch}
+        />
+      )}
     </AppLayout>
   );
 }
