@@ -3,15 +3,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-import Database from 'better-sqlite3';
 import { signJwt, authMiddleware } from './auth';
 
-// Correctly instantiate the adapter and Prisma Client
-const sqlite = new Database(process.env.DATABASE_URL!.replace('file:', ''));
-const adapter = new PrismaBetterSqlite3(sqlite);
-const prisma = new PrismaClient({ adapter });
-
+const prisma = new PrismaClient();
 const app = express();
 const port = 3000;
 
