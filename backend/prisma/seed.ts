@@ -1,13 +1,8 @@
 import 'dotenv/config'; // Ensures .env is loaded first
 import { PrismaClient } from '@prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import bcrypt from 'bcrypt';
-import Database from 'better-sqlite3';
 
-// Correctly instantiate the adapter and Prisma Client for the script
-const sqlite = new Database(process.env.DATABASE_URL!.replace('file:', ''));
-const adapter = new PrismaBetterSqlite3(sqlite);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
     console.log('Start seeding...');
